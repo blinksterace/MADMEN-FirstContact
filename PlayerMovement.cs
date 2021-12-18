@@ -10,6 +10,7 @@ public class PlayerMovement : MonoBehaviour
     public float dodgeTime;
 
     [SerializeField] Transform orientation;
+    [SerializeField] Transform cameraPosition;
 
     [Header("Movement")]
     public float moveSpeed = 6f;
@@ -33,10 +34,14 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] LayerMask groundMask;
     bool isGrounded;
     float groundDistance = 0.4f;
+    bool crouch;
+
+    float dodgeSpeed;
     
 
     Vector3 moveDirection;
     Vector3 slopeMoveDirection;
+    Vector3 placeholder;
 
     Rigidbody rb;
 
@@ -60,6 +65,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void Start()
     {
+        dodgeSpeed = 15.0f;
+        crouch = false;
         rb = GetComponent<Rigidbody>();
         rb.freezeRotation = true;
     }
@@ -69,17 +76,21 @@ public class PlayerMovement : MonoBehaviour
         isGrounded = Physics.CheckSphere(transform.position - new Vector3(0, 1, 0), groundDistance, groundMask);
         ControlDrag();
         MyInput();
-        
 
-        if(Input.GetKeyDown(jumpKey) && isGrounded)
+
+        if (Input.GetKeyDown(jumpKey) && isGrounded && !crouch)
         {
             Jump();
         }
 
+        if (Input.GetKeyDown(KeyCode.LeftControl) && isGrounded)
+        {
+            Crouch();
+        }
+
+
         if (Input.GetKeyDown("left shift") && !(Input.GetKey("w")) && !coolDown)
             Dodge();
-
-        //print(this.gameObject.transform.rotation);
 
         slopeMoveDirection = Vector3.ProjectOnPlane(moveDirection, slopeHit.normal);
     }
@@ -101,22 +112,28 @@ public class PlayerMovement : MonoBehaviour
     {
         if ((Input.GetKey("a")))
         {
-            print("Dodging Left");
-            rb.AddForce(-transform.right * 15.0f, ForceMode.Impulse);
+            print("Dodging Left " + dodgeSpeed);
+            rb.AddForce(-transform.right * dodgeSpeed, ForceMode.Impulse);
+
+            coolDown = true;
+            Invoke("ResetCoolDown", dodgeTime);
         }
         else if ((Input.GetKey("d")))
         {
-            print("Dodging Right");
-            rb.AddForce(transform.right * 15.0f, ForceMode.Impulse);
-        }
-        else if ((Input.GetKey("s")))
-        {
-            print("Dodging Back");
-            rb.AddForce(-transform.forward * 15.0f, ForceMode.Impulse);
-        }
+            print("Dodging Right " + dodgeSpeed);
+            rb.AddForce(transform.right * dodgeSpeed, ForceMode.Impulse);
 
-        coolDown = true;
-        Invoke("ResetCoolDown", dodgeTime);
+            coolDown = true;
+            Invoke("ResetCoolDown", dodgeTime);
+        }
+        else if ((Input.GetKey("s") && !crouch))
+        {
+            print("Dodging Back " + dodgeSpeed);
+            rb.AddForce(-transform.forward * dodgeSpeed, ForceMode.Impulse);
+
+            coolDown = true;
+            Invoke("ResetCoolDown", dodgeTime);
+        }
     }
 
     void ControlDrag()
@@ -131,6 +148,32 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    void Crouch()
+    {
+        if (!crouch)
+        {
+            //Rotate to prone
+            placeholder = transform.eulerAngles;
+            placeholder.x = 90.0f;
+            transform.eulerAngles = placeholder;
+
+            dodgeSpeed = 7.0f;
+
+            crouch = true;
+        }
+        else
+        {
+            //Rotate to stand
+            placeholder = transform.eulerAngles;
+            placeholder.x = 0.0f;
+            transform.eulerAngles = placeholder;
+
+            dodgeSpeed = 15.0f;
+
+            crouch = false;
+        }
+    }
+
     private void FixedUpdate()
     {
         MovePlayer();
@@ -142,9 +185,12 @@ public class PlayerMovement : MonoBehaviour
     }
 
     void MovePlayer()
-    {
-        if (Input.GetKey("left shift") && !(Input.GetKey("a") || Input.GetKey("s") || Input.GetKey("d")))
+    {   
+        if (Input.GetKey("left shift") && Input.GetKey("w") && !(Input.GetKey("a") || Input.GetKey("s") || Input.GetKey("d")) && !crouch)
+        {
+            print("Sprinting");
             sprint = 1.5f;
+        }
         else
             sprint = 1.0f;
 
